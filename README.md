@@ -25,7 +25,7 @@ overlay only — **no game files**. You need your own PC copy of Condemned.
   its menu) and **Condemned: Setup**.
 - `Condemned.keys.txt`, `Condemned.wine-nx.txt` (DXVK), `autoexec.cfg` (1280×720).
 
-About 20–25 fps on the author's console.
+About 25–30 fps on the author's console, overclocked: CPU 1683 MHz, GPU 537 MHz, RAM 2333 MHz.
 
 ### Requirements
 
@@ -187,7 +187,7 @@ PC-игра 2005 года на (прошитой) Nintendo Switch через
   **Condemned: Setup**.
 - `Condemned.keys.txt`, `Condemned.wine-nx.txt` (DXVK), `autoexec.cfg` (1280×720).
 
-На консоли автора — около 20–25 кадров в секунду.
+На консоли автора — около 25–30 кадров в секунду, с разгоном: CPU 1683 МГц, GPU 537 МГц, RAM 2333 МГц.
 
 ### Что нужно
 
