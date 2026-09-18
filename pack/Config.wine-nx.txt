@@ -1,0 +1,2 @@
+# Config.exe is the PC settings tool; settings come from autoexec.cfg instead.
+hidden=1

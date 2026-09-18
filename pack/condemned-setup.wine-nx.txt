@@ -1,0 +1,3 @@
+# One-time setup: registers DirectSound (COM) in the card's registry.
+# Run once before the first game start; see its [CONDEMNED SETUP] lines in wine-nx-runtime.log.
+title=Condemned: Setup (run once)

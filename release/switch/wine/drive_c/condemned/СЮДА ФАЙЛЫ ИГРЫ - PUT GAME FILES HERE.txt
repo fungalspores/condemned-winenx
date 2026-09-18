@@ -1,0 +1,2 @@
+Сюда — файлы установленной игры (всё, что лежит рядом с Condemned.exe).
+Put your installed game here (everything next to Condemned.exe).

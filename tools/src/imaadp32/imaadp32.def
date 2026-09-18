@@ -1,0 +1,3 @@
+LIBRARY imaadp32.acm
+EXPORTS
+    DriverProc=ADPCM_DriverProc@20

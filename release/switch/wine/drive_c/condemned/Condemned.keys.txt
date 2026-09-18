@@ -1,0 +1,39 @@
+# Condemned.exe — being tested on the console.
+# Every control is listed so the global keys.txt defaults (STICKR=Alt etc.) are not inherited.
+#
+# Wine-NX names (runtime.c wine_nx_pad_key_names) — ONLY these:
+#   UP DOWN LEFT RIGHT X Y L R ZL ZR PLUS MINUS STICKL STICKR A B
+# UP/DOWN/LEFT/RIGHT are shared by the D-pad and the left stick (dead zone 12000).
+# A key of 0 for A or B makes Wine-NX send a mouse button (A = left, B = right).
+# The right stick moves the mouse, which is how Condemned looks around.
+#
+# Menus are driven like a console's: D-pad/left stick = arrows, A = Enter, + = Esc.
+# The pack's dinput8.dll turns those into the game's default bindings in play:
+# each arrow also presses W/S/A/D, Enter also presses the left mouse button (Fire),
+# F24 (R3) presses the middle button (Focus). It is also what brings the mouse to
+# the game at all: Wine-NX build 108 has no raw mouse input for DirectInput 8.
+#
+# Defaults read from ProfileDatabase\Defaults.Gamdb00p (CondemnedL.Arch00):
+#   Fire = Mouse Button 0, Block = Mouse Button 1, Focus = Mouse Button 2,
+#   W/S/A/D move, Shift run, Space kick, E activate, R ammo check, F flashlight,
+#   T tools, Tab toggle melee, Q lean left, 1-4 "D-Pad" commands, Taser = unbound.
+# Taser has no default: bind it to Ctrl once in Options > Controls > Keyboard.
+#
+# Do NOT install the repack's XInputPlus: once a program polls XInput, Wine-NX
+# stops sending keys and mouse from the pad, and Condemned only reads DirectInput.
+A=0x0D       # Enter: menus select / OK; in play Fire (proxy: left mouse button)
+B=0x0        # mouse right: Block
+X=0x45       # E: activate / pick up
+Y=0x46       # F: flashlight
+L=0x09       # Tab: toggle melee
+R=0x11       # Ctrl: taser (bind once, see above)
+ZL=0x10      # Shift: run (hold)
+ZR=0x20      # Space: kick
+PLUS=0x1B    # Esc: pause / back
+MINUS=0x54   # T: forensic tools
+STICKL=0x52  # R: ammo check
+STICKR=0x87  # F24: Focus (proxy: middle mouse button)
+UP=0x26      # Up arrow: menus; in play also W (proxy), forward
+DOWN=0x28    # Down arrow: menus; in play also S, backward
+LEFT=0x25    # Left arrow: menus; in play also A, strafe left
+RIGHT=0x27   # Right arrow: menus; in play also D, strafe right

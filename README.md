@@ -1,0 +1,271 @@
+# Condemned: Criminal Origins on Nintendo Switch (Wine-NX)
+
+[English](#english) · [Русский](#русский)
+
+The 2005 PC game running on a (modded) Nintendo Switch through
+[Wine-NX](https://github.com/danfromtico/wine-nx): menus, camera, combat, sound,
+and a HOME menu icon that starts the game directly. This repository is the
+overlay only — **no game files**. You need your own PC copy of Condemned.
+
+![status](https://img.shields.io/badge/status-playable-brightgreen)
+
+---
+
+## English
+
+### What you get
+
+- `dinput8.dll` — a DirectInput proxy that gives the game a mouse and keyboard
+  Wine-NX does not deliver (right stick = look, D-pad = move and menus, full pad map).
+- `imaadp32.acm` — Wine's IMA ADPCM codec; without it the game's sound driver
+  silently turns sound off.
+- `condemned-setup.exe` — run once on the console: fixes `Condemned.exe`'s header,
+  registers DirectSound, disables conflicting files, checks the folder.
+- Two NSPs: **Condemned: Criminal Origins** (starts the game in Wine-NX, skipping
+  its menu) and **Condemned: Setup**.
+- `Condemned.keys.txt`, `Condemned.wine-nx.txt` (DXVK), `autoexec.cfg` (1280×720).
+
+About 20–25 fps on the author's console.
+
+### Requirements
+
+- Switch with Atmosphère **1.8.0+** and sigpatches (for the NSPs).
+- SD card formatted **exFAT** (`CondemnedA.Arch00` is 6.2 GB).
+- [Wine-NX Test Build 2](https://github.com/danfromtico/wine-nx/releases/tag/test-build-2) (build 108).
+- Condemned: Criminal Origins for PC, installed, **without SecuROM** — Wine-NX
+  cannot run the disc protection. Tested with the English game plus the Spirit Team
+  text and Team Raccoon voice translations.
+
+### Install
+
+1. Copy Wine-NX Test Build 2's `switch` folder to the SD card root.
+2. Copy your installed game (the folder with `Condemned.exe`) to
+   `sdmc:/switch/wine/drive_c/condemned/`.
+3. Copy `release/switch` from this repository over the card, **replacing files**
+   (the game's own `dinput8.dll` must be replaced by the pack's).
+4. Install both NSPs from `release/` (DBI, sphaira, Tinfoil).
+5. Start **Condemned: Setup** once and wait for "Setup done" (press A).
+6. Start **Condemned: Criminal Origins**.
+
+In the game: Options → Controls → Keyboard, bind **Taser** to Ctrl (it has no
+default key; Ctrl is R on the pad). Raise the mouse sensitivity to taste.
+
+### Controls
+
+| Switch | Key sent | In menus | In game |
+|---|---|---|---|
+| Left stick / D-pad | arrows (+W/S/A/D in game) | navigate | move |
+| Right stick | mouse | — | look |
+| A | Enter (+left mouse) | select | attack |
+| B | right mouse | — | block |
+| X | E | — | use / pick up |
+| Y | F | — | flashlight |
+| L | Tab | — | melee / firearm |
+| R | Ctrl | — | taser (bind once) |
+| ZL | Shift | — | run |
+| ZR | Space | — | kick |
+| L3 | R | — | check ammo |
+| R3 | F24 (middle mouse) | — | focus |
+| + | Esc | back | pause |
+| − | T | — | forensic tools |
+
+### Build from source
+
+```sh
+sh tools/fetch_winenx.sh                 # Wine-NX Test Build 2 into components/wine-nx
+sh tools/fetch_d3dx9_27.sh               # d3dx9_27.dll from Microsoft's DirectX redist
+sh tools/build_win32.sh                  # dinput8.dll, condemned-setup.exe, imaadp32.acm (llvm-mingw)
+pip install cryptography pillow lz4
+python3 nsp/make_icon.py                 # icons from the game's splash screens (needs game/)
+python3 nsp/build_nsp.py                 # both NSPs; header_key from ~/.switch/prod.keys
+python3 tools/assemble_sd.py             # full card layout in ./sd from game/ + components/ + pack/
+```
+
+`tools/build_win32.sh` downloads llvm-mingw 20260505 if `LLVM_MINGW` is not set.
+The NSP builder needs your own `prod.keys` (only `header_key` is used).
+
+### How it was made
+
+Each problem, what caused it and the fix, in the order they showed up.
+
+1. **`map target status=c000007b`.** The no-SecuROM `Condemned.exe` has
+   `SizeOfImage` 0x18e2f4, not rounded to the page size, which Wine-NX build 108
+   rejects (fixed upstream in 109). It also has a writable *shared* section
+   (`.SHARED`), which Wine maps from a shared file the Horizon server never
+   provides. Fix: round `SizeOfImage` and clear `MEM_SHARED` — 3 bytes, done by
+   `condemned-setup.exe` on the console (`tools/fix_condemned_exe.py` on a computer).
+2. **Missing `d3dx9_27.dll`.** Not in Wine-NX; Microsoft's redistributable DLL is used.
+3. **Black screen forever.** `EAX.DLL` creates DirectSound through COM, and
+   Wine-NX never runs wineboot, so `CLSID_DirectSound8` is not registered. The
+   game's error box was hidden behind the Vulkan surface. Fix: the setup program
+   registers `dsound.dll`.
+4. **No mouse.** Wine's DirectInput 8 reads the mouse only through raw input, and
+   Wine-NX's Horizon server queues raw input for the keyboard but not the mouse.
+   Fix: the `dinput8.dll` proxy loads Wine's `dinput8.dll` and fills the system
+   mouse's `GetDeviceState`/`GetDeviceData` itself — cursor movement from the right
+   stick (smoothed, re-centred while the game hides the cursor) and buttons from the
+   key state.
+5. **No keyboard in play.** The game's 696-byte DirectInput keyboard format also
+   got nothing. Fix: the proxy builds it from the key state; each arrow also presses
+   W/S/A/D, so the D-pad drives both menus (window messages) and movement.
+6. **No sound.** Found by wrapping all 175 methods of `SndDrv.dll`'s sound object
+   and logging which the engine calls: its ACM setup needs PCM, IMA ADPCM and MP3
+   codecs and, when they are not registered, loads `IMAADP32.ACM` and
+   `L3CODECA.ACM` itself. Wine-NX ships only the MP3 one, so the engine silently
+   disabled sound. Fix: Wine 10.0's `imaadp32.acm`, built with llvm-mingw, next to
+   the exe. The proxy also turns the game's hardware DirectSound buffers into
+   software ones (Wine has no hardware mixing).
+7. **Stutter on every start.** DXVK keeps its shader cache in
+   `DXVK_SHADER_CACHE_PATH` or `%LOCALAPPDATA%`; Wine-NX's fixed environment has
+   neither. Fix: the proxy sets `DXVK_SHADER_CACHE_PATH` to `C:\condemned\dxvk-cache`.
+8. **HOME icon.** `nsp/build_nsp.py` is sphaira's on-console forwarder builder
+   (`owo.cpp`) ported to Python: sphaira's nx-hbloader forwarder with its NPDM set
+   to the **32-bit (no alias)** address space (the exe has no relocations and must
+   load at 0x400000), and a romfs `nextArgv` that starts Wine-NX with the game's
+   path, which makes the runtime skip its menu. Lesson learned: CNMT content records
+   use `NcmContentType` numbers (Program = 1, Control = 3), not the NCA header's
+   (0 and 2) — with the wrong ones HOME shows an endless loading tile.
+
+The engine is LithTech Jupiter EX; the released
+[No One Lives Forever 2 source](https://github.com/wilkie/no-one-lives-forever-2)
+helped read its input and sound code.
+
+### Repository
+
+| Path | What |
+|---|---|
+| `pack/` | Files for the game folder: pad map, Wine-NX sidecars, `autoexec.cfg`, `default.archcfg` (Russian text only) |
+| `tools/src/dinput8_proxy` | The DirectInput proxy (C, no C runtime) |
+| `tools/src/condemned_setup` | The setup program and the header fix (`pe_fix.h`) |
+| `tools/src/imaadp32` | Wine 10.0's IMA ADPCM codec (LGPL-2.1) with build shims |
+| `tools/build_win32.sh` | Builds the three Win32 files with llvm-mingw |
+| `nsp/` | NSP builder and icon maker |
+| `tools/assemble_sd.py` | Builds the whole card layout from `game/`, `components/` and `pack/` |
+| `release/` | Prebuilt files and both NSPs |
+
+### Credits
+
+Wine-NX and mesa-switch by danfromtico · sphaira by ITotalJustice (forwarder:
+nx-hbloader, ISC) · Wine (imaadp32, LGPL-2.1) · DXVK · Mesa · hactool (used to
+check the NSPs) · Condemned: Criminal Origins by Monolith Productions.
+
+---
+
+## Русский
+
+### Что это
+
+PC-игра 2005 года на (прошитой) Nintendo Switch через
+[Wine-NX](https://github.com/danfromtico/wine-nx): меню, камера, бой, звук и иконка на
+главном экране, которая сразу запускает игру. В репозитории только оверлей —
+**файлов игры нет**, нужна своя PC-копия Condemned.
+
+- `dinput8.dll` — прокси DirectInput: даёт игре мышь и клавиатуру, которых Wine-NX не
+  передаёт (правый стик — обзор, крестовина — ходьба и меню, вся раскладка пада).
+- `imaadp32.acm` — кодек IMA ADPCM из Wine; без него звуковой драйвер игры молча
+  выключает звук.
+- `condemned-setup.exe` — запустить один раз на консоли: правит заголовок
+  `Condemned.exe`, регистрирует DirectSound, отключает мешающие файлы, проверяет папку.
+- Два NSP: **Condemned: Criminal Origins** (запускает игру в Wine-NX без его меню) и
+  **Condemned: Setup**.
+- `Condemned.keys.txt`, `Condemned.wine-nx.txt` (DXVK), `autoexec.cfg` (1280×720).
+
+На консоли автора — около 20–25 кадров в секунду.
+
+### Что нужно
+
+- Switch с Atmosphère **1.8.0+** и sigpatches (для NSP).
+- Карта в **exFAT** (`CondemnedA.Arch00` весит 6,2 ГБ).
+- [Wine-NX Test Build 2](https://github.com/danfromtico/wine-nx/releases/tag/test-build-2) (build 108).
+- Установленная PC-версия Condemned: Criminal Origins **без SecuROM** — защиту диска
+  Wine-NX не запускает. Проверено с английской версией, текстом Spirit Team и
+  озвучкой Team Raccoon.
+
+### Установка
+
+1. Скопируйте папку `switch` из Wine-NX Test Build 2 в корень карты.
+2. Скопируйте установленную игру (папку с `Condemned.exe`) в
+   `sdmc:/switch/wine/drive_c/condemned/`.
+3. Скопируйте `release/switch` из репозитория на карту **с заменой**
+   (`dinput8.dll` игры должен замениться на файл из пака).
+4. Установите оба NSP из `release/` (DBI, sphaira, Tinfoil).
+5. Один раз запустите **Condemned: Setup** и дождитесь окна «Настройка завершена» (A).
+6. Запускайте **Condemned: Criminal Origins**.
+
+В игре: Настройки → Управление → Клавиатура, назначьте **Шокер** на Ctrl (у него нет
+клавиши по умолчанию; Ctrl — кнопка R). Чувствительность мыши — по вкусу.
+
+### Управление
+
+| Switch | Клавиша | В меню | В игре |
+|---|---|---|---|
+| Левый стик / крестовина | стрелки (+W/S/A/D в игре) | выбор | ходьба |
+| Правый стик | мышь | — | обзор |
+| A | Enter (+левая кнопка мыши) | выбрать | удар |
+| B | правая кнопка мыши | — | блок |
+| X | E | — | использовать / поднять |
+| Y | F | — | фонарик |
+| L | Tab | — | ближний бой / оружие |
+| R | Ctrl | — | шокер (назначить один раз) |
+| ZL | Shift | — | бег |
+| ZR | Space | — | пинок |
+| L3 | R | — | проверить патроны |
+| R3 | F24 (средняя кнопка мыши) | — | фокус |
+| + | Esc | назад | пауза |
+| − | T | — | криминалистика |
+
+### Сборка из исходников
+
+Команды — в английском разделе выше. `tools/build_win32.sh` сам скачает llvm-mingw
+20260505, если не задан `LLVM_MINGW`. Для NSP нужен свой `prod.keys` (используется
+только `header_key`).
+
+### Как это сделано
+
+Проблемы в том порядке, в каком они встретились, их причины и решения.
+
+1. **`map target status=c000007b`.** У `Condemned.exe` без SecuROM `SizeOfImage` =
+   0x18e2f4, не кратен странице — Wine-NX build 108 такой exe не грузит (в 109
+   исправлено). И есть записываемая *общая* секция `.SHARED`, которую Wine отображает
+   из общего файла, а сервер Horizon его не даёт. Решение: округлить `SizeOfImage` и
+   снять `MEM_SHARED` — 3 байта; делает `condemned-setup.exe` прямо на консоли
+   (на компьютере — `tools/fix_condemned_exe.py`).
+2. **Нет `d3dx9_27.dll`.** В Wine-NX её нет; берётся DLL из редистрибутива Microsoft.
+3. **Вечный чёрный экран.** `EAX.DLL` создаёт DirectSound через COM, а Wine-NX не
+   запускает wineboot, поэтому `CLSID_DirectSound8` не зарегистрирован. Окно с ошибкой
+   пряталось за поверхностью Vulkan. Решение: setup регистрирует `dsound.dll`.
+4. **Нет мыши.** DirectInput 8 в Wine читает мышь только через raw input, а сервер
+   Horizon в Wine-NX ставит raw input в очередь для клавиатуры, но не для мыши.
+   Решение: прокси `dinput8.dll` загружает `dinput8.dll` из Wine и сам заполняет
+   `GetDeviceState`/`GetDeviceData` системной мыши — движение курсора от правого
+   стика (со сглаживанием и возвратом в центр, пока игра прячет курсор) и кнопки из
+   состояния клавиш.
+5. **Нет клавиатуры в игре.** Клавиатура DirectInput (формат игры на 696 байт) тоже
+   была пустой. Решение: прокси собирает её из состояния клавиш, и каждая стрелка
+   заодно нажимает W/S/A/D — крестовина работает и в меню, и для ходьбы.
+6. **Нет звука.** Нашли, обернув все 175 методов звукового объекта `SndDrv.dll` и
+   записав, какие вызывает движок: при запуске он требует кодеки ACM PCM, IMA ADPCM и
+   MP3 и, если их нет в реестре, сам грузит `IMAADP32.ACM` и `L3CODECA.ACM`. В Wine-NX
+   есть только MP3, и движок молча выключал звук. Решение: `imaadp32.acm` из Wine 10.0,
+   собранный llvm-mingw, рядом с exe. Ещё прокси делает аппаратные буферы DirectSound
+   программными (аппаратного микширования в Wine нет).
+7. **Подтормаживания при каждом запуске.** DXVK хранит кэш шейдеров в
+   `DXVK_SHADER_CACHE_PATH` или `%LOCALAPPDATA%`, а в фиксированном окружении Wine-NX
+   нет ни того, ни другого. Решение: прокси задаёт `DXVK_SHADER_CACHE_PATH` =
+   `C:\condemned\dxvk-cache`.
+8. **Иконка на главном экране.** `nsp/build_nsp.py` — перенесённый на Python сборщик
+   форвардеров sphaira (`owo.cpp`): форвардер nx-hbloader из sphaira с NPDM под
+   адресное пространство **32-bit (no alias)** (у exe нет релокаций, он грузится только
+   по 0x400000) и `nextArgv` в romfs, который запускает Wine-NX с путём к игре — тогда
+   рантайм пропускает своё меню. Урок: в CNMT типы контента нумеруются по
+   `NcmContentType` (Program = 1, Control = 3), а не как в заголовке NCA (0 и 2) —
+   с неверными значок на главном экране вечно грузится.
+
+Движок — LithTech Jupiter EX; разобраться в его вводе и звуке помогли
+[исходники No One Lives Forever 2](https://github.com/wilkie/no-one-lives-forever-2).
+
+### Благодарности
+
+Wine-NX и mesa-switch — danfromtico · sphaira — ITotalJustice (форвардер: nx-hbloader,
+ISC) · Wine (imaadp32, LGPL-2.1) · DXVK · Mesa · hactool (проверка NSP) ·
+Condemned: Criminal Origins — Monolith Productions.

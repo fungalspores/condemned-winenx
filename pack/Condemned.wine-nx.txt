@@ -1,0 +1,5 @@
+# Wine-NX launcher sidecar for Condemned.exe.
+# Launch through a forwarder set to "32-bit, no alias": Condemned.exe has no
+# relocation table (fixed base 0x400000), same as NFSU2's SPEED2.EXE.
+title=Condemned: Criminal Origins
+d3d9=dxvk

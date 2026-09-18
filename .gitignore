@@ -1,0 +1,12 @@
+# Game files never go into this repository
+/game/
+/components/
+/sd/
+*.log
+
+# NSP build: icons come from the game, keys are your own
+/nsp/icon*.jpg
+/nsp/out/
+/nsp/_work/
+
+.DS_Store
