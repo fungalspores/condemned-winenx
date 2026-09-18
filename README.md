@@ -16,7 +16,8 @@ overlay only — **no game files**. You need your own PC copy of Condemned.
 ### What you get
 
 - `dinput8.dll` — a DirectInput proxy that gives the game a mouse and keyboard
-  Wine-NX does not deliver (right stick = look, D-pad = move and menus, full pad map).
+  Wine-NX does not deliver (right stick = look, D-pad = move and menus, full pad map),
+  and makes saves take a fraction of a second instead of minutes.
 - `imaadp32.acm` — Wine's IMA ADPCM codec; without it the game's sound driver
   silently turns sound off.
 - `condemned-setup.exe` — run once on the console: fixes `Condemned.exe`'s header,
@@ -125,6 +126,16 @@ Each problem, what caused it and the fix, in the order they showed up.
    path, which makes the runtime skip its menu. Lesson learned: CNMT content records
    use `NcmContentType` numbers (Program = 1, Control = 3), not the NCA header's
    (0 and 2) — with the wrong ones HOME shows an endless loading tile.
+9. **Every autosave froze the game for 2–3 minutes.** The log's busiest system call
+   during the freeze was `NtWriteFile`, ~900 a second with the CPU idle: the engine
+   writes a 1.2 MB save a few bytes per `WriteFile` (135,000 calls), and on Wine-NX
+   each one goes through the Horizon server to the SD card. Fix: the proxy hooks the
+   file imports of the five modules that write files and keeps a 256 KB window per
+   file, tracking the file position itself, so writes and the engine's constant
+   seeks back (to fill in chunk sizes) cost nothing; the window goes to the card in
+   one piece. A plain buffer that every seek flushed still took ~7 s (8,000 card
+   writes); the window takes **0.15 s (13 card writes)**. It was checked against
+   direct writes with 6 million random operations before going to the console.
 
 The engine is LithTech Jupiter EX; the released
 [No One Lives Forever 2 source](https://github.com/wilkie/no-one-lives-forever-2)
@@ -178,7 +189,8 @@ PC-игра 2005 года на (прошитой) Nintendo Switch через
 **файлов игры нет**, нужна своя PC-копия Condemned.
 
 - `dinput8.dll` — прокси DirectInput: даёт игре мышь и клавиатуру, которых Wine-NX не
-  передаёт (правый стик — обзор, крестовина — ходьба и меню, вся раскладка пада).
+  передаёт (правый стик — обзор, крестовина — ходьба и меню, вся раскладка пада), и
+  ускоряет сохранения с минут до долей секунды.
 - `imaadp32.acm` — кодек IMA ADPCM из Wine; без него звуковой драйвер игры молча
   выключает звук.
 - `condemned-setup.exe` — запустить один раз на консоли: правит заголовок
@@ -277,6 +289,16 @@ PC-игра 2005 года на (прошитой) Nintendo Switch через
    рантайм пропускает своё меню. Урок: в CNMT типы контента нумеруются по
    `NcmContentType` (Program = 1, Control = 3), а не как в заголовке NCA (0 и 2) —
    с неверными значок на главном экране вечно грузится.
+9. **Каждое автосохранение замораживало игру на 2–3 минуты.** Чаще всего во время
+   зависания в логе был системный вызов `NtWriteFile`, ~900 в секунду при простаивающем
+   процессоре: движок пишет сохранение на 1,2 МБ по нескольку байт за `WriteFile`
+   (135 000 вызовов), а в Wine-NX каждый идёт через сервер Horizon на SD-карту. Решение:
+   прокси перехватывает файловые импорты пяти модулей, которые пишут файлы, и держит
+   для каждого файла окно на 256 КБ, сам ведя позицию в файле, — записи и постоянные
+   перемотки движка назад (вписать размер блока) ничего не стоят, а на карту окно уходит
+   одним куском. Простой буфер, который сбрасывался на каждой перемотке, давал ~7 с
+   (8 000 записей на карту); окно — **0,15 с (13 записей)**. Перед консолью его сверили
+   с прямой записью на 6 миллионах случайных операций.
 
 Движок — LithTech Jupiter EX; разобраться в его вводе и звуке помогли
 [исходники No One Lives Forever 2](https://github.com/wilkie/no-one-lives-forever-2).

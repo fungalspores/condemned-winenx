@@ -24,7 +24,8 @@
  * Not input, but the same trick: the game's sound asks DirectSound for hardware
  * buffers, which Wine refuses, so the proxy also hooks how SndDrv.dll gets its
  * DirectSound and makes those buffers software ones (see "sound" below). It also
- * gives DXVK a folder for its shader cache, which Wine-NX's environment lacks.
+ * gives DXVK a folder for its shader cache, which Wine-NX's environment lacks, and
+ * buffers the game's tiny file writes, which made every save take minutes.
  *
  * Everything the proxy sees is reported to wine-nx-runtime.log as
  * [DINPUT8 PROXY] lines. */
@@ -331,6 +332,8 @@ static LONG smooth( LONG *pending, LONG raw )
     return out;
 }
 
+static void watch_file_modules( void );
+
 /* Cursor movement and button changes since the last read, into both paths. */
 static void sample( struct mouse *mouse )
 {
@@ -339,6 +342,7 @@ static void sample( struct mouse *mouse )
     unsigned int i;
 
     install_spy();
+    watch_file_modules();
     if (GetCursorPos( &pos ))
     {
         if (last_cursor_valid)
@@ -1076,6 +1080,343 @@ static HMODULE WINAPI hook_LoadLibraryA( const char *name )
     return module;
 }
 
+/* ---- saves: buffered writes ----
+ * The game writes its saves a few bytes per WriteFile. On Wine-NX each call goes
+ * through the Horizon server to the SD card and waits about a millisecond, so an
+ * autosave took minutes: 162,000 NtWriteFile calls over three minutes after a level
+ * loaded, ~900 a second at a checkpoint, the game frozen and the CPU idle.
+ *
+ * The modules that write files themselves (CreateFileA/WriteFile) get their file
+ * imports hooked. A file they open for writing keeps a 256 KB window of what was
+ * written: the proxy keeps the game's file position itself, so writes anywhere in
+ * the window and seeks cost nothing (the engine writes a chunk, seeks back to put
+ * its size in front, seeks forward again). The window goes to the card in one piece
+ * at its offset when a write falls outside it, before any read, time query or
+ * close of that file, and before any file is opened, copied, deleted or searched
+ * for, so nothing ever sees the file without its data. Build 13 kept a plain
+ * buffer that every seek wrote out: saves went from minutes to ~7 s, in ~8,000
+ * card writes of ~160 bytes. */
+#define WB_FILES 16
+#define WB_SIZE (256 * 1024)
+
+struct wbuf
+{
+    HANDLE file;
+    BYTE *data;
+    ULONGLONG base;         /* file offset of data[0] */
+    ULONGLONG pos;          /* the game's file position */
+    ULONGLONG real;         /* where the real file pointer is */
+    DWORD len, opened;      /* len: bytes of the window written so far */
+    unsigned int writes, seeks, flushes;
+    ULONGLONG bytes;
+    char name[96];
+};
+
+static struct wbuf wbufs[WB_FILES];
+static CRITICAL_SECTION wb_lock;
+static unsigned int wb_logged;
+
+static HANDLE (WINAPI *real_CreateFileA)( LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE );
+static BOOL (WINAPI *real_WriteFile)( HANDLE, LPCVOID, DWORD, LPDWORD, LPOVERLAPPED );
+static BOOL (WINAPI *real_ReadFile)( HANDLE, LPVOID, DWORD, LPDWORD, LPOVERLAPPED );
+static BOOL (WINAPI *real_SetFilePointerEx)( HANDLE, LARGE_INTEGER, PLARGE_INTEGER, DWORD );
+static BOOL (WINAPI *real_GetFileSizeEx)( HANDLE, PLARGE_INTEGER );
+static BOOL (WINAPI *real_GetFileTime)( HANDLE, LPFILETIME, LPFILETIME, LPFILETIME );
+static BOOL (WINAPI *real_CloseHandle)( HANDLE );
+static BOOL (WINAPI *real_DeleteFileA)( LPCSTR );
+static BOOL (WINAPI *real_CopyFileA)( LPCSTR, LPCSTR, BOOL );
+static HANDLE (WINAPI *real_FindFirstFileA)( LPCSTR, LPWIN32_FIND_DATAA );
+
+static struct wbuf *wb_find( HANDLE file )
+{
+    unsigned int i;
+    if (!file || file == INVALID_HANDLE_VALUE) return NULL;
+    for (i = 0; i < WB_FILES; i++) if (wbufs[i].file == file) return &wbufs[i];
+    return NULL;
+}
+
+static BOOL wb_seek_real( struct wbuf *wb, ULONGLONG offset )
+{
+    LARGE_INTEGER to;
+
+    if (wb->real == offset) return TRUE;
+    to.QuadPart = (LONGLONG)offset;
+    if (!real_SetFilePointerEx( wb->file, to, NULL, FILE_BEGIN )) return FALSE;
+    wb->real = offset;
+    return TRUE;
+}
+
+/* The window to the card at its offset, and the real file pointer to the game's
+ * position, ready for a real call. Called with wb_lock held. */
+static BOOL wb_flush( struct wbuf *wb )
+{
+    DWORD done = 0;
+    BOOL ok = TRUE;
+
+    if (wb->len)
+    {
+        ok = wb_seek_real( wb, wb->base ) && real_WriteFile( wb->file, wb->data, wb->len, &done, NULL ) &&
+             done == wb->len;
+        wb->real = wb->base + done;
+        if (!ok) log_line( "buffered write to %s failed: %u of %u bytes, error %u", wb->name,
+                           (unsigned int)done, (unsigned int)wb->len, (unsigned int)GetLastError() );
+        wb->len = 0;
+        wb->flushes++;
+    }
+    wb_seek_real( wb, wb->pos );
+    return ok;
+}
+
+static void wb_flush_all( void )
+{
+    unsigned int i;
+
+    EnterCriticalSection( &wb_lock );
+    for (i = 0; i < WB_FILES; i++) if (wbufs[i].file) wb_flush( &wbufs[i] );
+    LeaveCriticalSection( &wb_lock );
+}
+
+static HANDLE WINAPI hook_CreateFileA( LPCSTR name, DWORD access, DWORD share, LPSECURITY_ATTRIBUTES sa,
+                                       DWORD disposition, DWORD flags, HANDLE template_file )
+{
+    HANDLE file;
+    unsigned int i, n;
+
+    wb_flush_all();
+    file = real_CreateFileA( name, access, share, sa, disposition, flags, template_file );
+    if (file == INVALID_HANDLE_VALUE || !(access & GENERIC_WRITE) ||
+        (flags & (FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH)))
+        return file;
+    EnterCriticalSection( &wb_lock );
+    for (i = 0; i < WB_FILES; i++)
+    {
+        if (wbufs[i].file) continue;
+        memset( &wbufs[i], 0, sizeof(wbufs[i]) );   /* a new handle is at offset 0 */
+        wbufs[i].file = file;
+        wbufs[i].opened = GetTickCount();
+        for (n = 0; name && name[n] && n < sizeof(wbufs[i].name) - 1; n++) wbufs[i].name[n] = name[n];
+        break;
+    }
+    LeaveCriticalSection( &wb_lock );
+    return file;
+}
+
+static BOOL WINAPI hook_WriteFile( HANDLE file, LPCVOID data, DWORD size, LPDWORD written, LPOVERLAPPED overlapped )
+{
+    struct wbuf *wb;
+    DWORD done = 0;
+    BOOL ok;
+
+    if (overlapped) return real_WriteFile( file, data, size, written, overlapped );
+    EnterCriticalSection( &wb_lock );
+    if (!(wb = wb_find( file )))
+    {
+        LeaveCriticalSection( &wb_lock );
+        return real_WriteFile( file, data, size, written, overlapped );
+    }
+    wb->writes++;
+    wb->bytes += size;
+    if (!wb->data) wb->data = VirtualAlloc( NULL, WB_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE );
+    if (!wb->data || size >= WB_SIZE / 2)
+    {
+        /* straight to the card, after the window: the order stays */
+        wb_flush( wb );
+        ok = real_WriteFile( file, data, size, &done, NULL );
+        wb->pos = wb->real = wb->pos + done;
+        if (written) *written = done;
+        LeaveCriticalSection( &wb_lock );
+        return ok;
+    }
+    /* the window holds bytes base..base+len with no gaps: a write must start inside
+     * it or right at its end, and fit */
+    if (wb->len && (wb->pos < wb->base || wb->pos > wb->base + wb->len || wb->pos + size > wb->base + WB_SIZE))
+        wb_flush( wb );
+    if (!wb->len) wb->base = wb->pos;
+    memcpy( wb->data + (DWORD)(wb->pos - wb->base), data, size );
+    wb->pos += size;
+    if (wb->pos - wb->base > wb->len) wb->len = (DWORD)(wb->pos - wb->base);
+    if (written) *written = size;
+    LeaveCriticalSection( &wb_lock );
+    return TRUE;
+}
+
+static BOOL WINAPI hook_ReadFile( HANDLE file, LPVOID data, DWORD size, LPDWORD got, LPOVERLAPPED overlapped )
+{
+    struct wbuf *wb;
+    DWORD done = 0;
+    BOOL ok;
+
+    if (overlapped) return real_ReadFile( file, data, size, got, overlapped );
+    EnterCriticalSection( &wb_lock );
+    if (!(wb = wb_find( file )))
+    {
+        LeaveCriticalSection( &wb_lock );
+        return real_ReadFile( file, data, size, got, overlapped );
+    }
+    wb_flush( wb );
+    ok = real_ReadFile( file, data, size, &done, NULL );
+    wb->pos = wb->real = wb->pos + done;
+    if (got) *got = done;
+    LeaveCriticalSection( &wb_lock );
+    return ok;
+}
+
+static BOOL WINAPI hook_SetFilePointerEx( HANDLE file, LARGE_INTEGER distance, PLARGE_INTEGER out, DWORD method )
+{
+    struct wbuf *wb;
+    LONGLONG target;
+    BOOL ok;
+
+    EnterCriticalSection( &wb_lock );
+    if (!(wb = wb_find( file )))
+    {
+        LeaveCriticalSection( &wb_lock );
+        return real_SetFilePointerEx( file, distance, out, method );
+    }
+    wb->seeks++;
+    if (method == FILE_END)   /* needs the size on the card: the window goes out first */
+    {
+        LARGE_INTEGER now;
+
+        wb_flush( wb );
+        ok = real_SetFilePointerEx( file, distance, &now, FILE_END );
+        if (ok) wb->pos = wb->real = (ULONGLONG)now.QuadPart;
+        if (ok && out) *out = now;
+        LeaveCriticalSection( &wb_lock );
+        return ok;
+    }
+    target = (method == FILE_CURRENT ? (LONGLONG)wb->pos : 0) + distance.QuadPart;
+    if (target < 0 || (method != FILE_BEGIN && method != FILE_CURRENT))
+    {
+        LeaveCriticalSection( &wb_lock );
+        SetLastError( ERROR_INVALID_PARAMETER );
+        return FALSE;
+    }
+    wb->pos = (ULONGLONG)target;
+    if (out) out->QuadPart = target;
+    LeaveCriticalSection( &wb_lock );
+    return TRUE;
+}
+
+static BOOL WINAPI hook_GetFileSizeEx( HANDLE file, PLARGE_INTEGER size )
+{
+    struct wbuf *wb;
+    BOOL ok;
+
+    EnterCriticalSection( &wb_lock );
+    ok = real_GetFileSizeEx( file, size );
+    /* the card's size, or the end of the window if it reaches further */
+    if (ok && (wb = wb_find( file )) && wb->len && (LONGLONG)(wb->base + wb->len) > size->QuadPart)
+        size->QuadPart = (LONGLONG)(wb->base + wb->len);
+    LeaveCriticalSection( &wb_lock );
+    return ok;
+}
+
+static BOOL WINAPI hook_GetFileTime( HANDLE file, LPFILETIME created, LPFILETIME accessed, LPFILETIME written )
+{
+    struct wbuf *wb;
+    BOOL ok;
+
+    EnterCriticalSection( &wb_lock );
+    if ((wb = wb_find( file ))) wb_flush( wb );
+    ok = real_GetFileTime( file, created, accessed, written );
+    LeaveCriticalSection( &wb_lock );
+    return ok;
+}
+
+static BOOL WINAPI hook_CloseHandle( HANDLE handle )
+{
+    struct wbuf *wb;
+
+    EnterCriticalSection( &wb_lock );
+    if ((wb = wb_find( handle )))
+    {
+        wb_flush( wb );
+        if (wb->writes >= 64 && wb_logged++ < 40)
+            log_line( "saved %s: %u writes, %u seeks, %u KB, %u card writes, %u ms", wb->name, wb->writes,
+                      wb->seeks, (unsigned int)(wb->bytes / 1024), wb->flushes,
+                      (unsigned int)(GetTickCount() - wb->opened) );
+        if (wb->data) VirtualFree( wb->data, 0, MEM_RELEASE );
+        memset( wb, 0, sizeof(*wb) );
+    }
+    LeaveCriticalSection( &wb_lock );
+    return real_CloseHandle( handle );
+}
+
+static BOOL WINAPI hook_DeleteFileA( LPCSTR name )
+{
+    wb_flush_all();
+    return real_DeleteFileA( name );
+}
+
+static BOOL WINAPI hook_CopyFileA( LPCSTR from, LPCSTR to, BOOL fail_if_exists )
+{
+    wb_flush_all();
+    return real_CopyFileA( from, to, fail_if_exists );
+}
+
+static HANDLE WINAPI hook_FindFirstFileA( LPCSTR pattern, LPWIN32_FIND_DATAA data )
+{
+    wb_flush_all();
+    return real_FindFirstFileA( pattern, data );
+}
+
+/* A module's file imports, all or none: a handle must never reach an unhooked
+ * import while it has data waiting. Returns FALSE when it has no WriteFile. */
+static BOOL hook_file_imports( HMODULE module )
+{
+    static const struct { const char *name; void *hook; void **real; } hooks[] =
+    {
+        { "CreateFileA",      hook_CreateFileA,      (void **)&real_CreateFileA },
+        { "ReadFile",         hook_ReadFile,         (void **)&real_ReadFile },
+        { "SetFilePointerEx", hook_SetFilePointerEx, (void **)&real_SetFilePointerEx },
+        { "GetFileSizeEx",    hook_GetFileSizeEx,    (void **)&real_GetFileSizeEx },
+        { "GetFileTime",      hook_GetFileTime,      (void **)&real_GetFileTime },
+        { "CloseHandle",      hook_CloseHandle,      (void **)&real_CloseHandle },
+        { "DeleteFileA",      hook_DeleteFileA,      (void **)&real_DeleteFileA },
+        { "CopyFileA",        hook_CopyFileA,        (void **)&real_CopyFileA },
+        { "FindFirstFileA",   hook_FindFirstFileA,   (void **)&real_FindFirstFileA },
+    };
+    HMODULE kernel32 = GetModuleHandleA( "kernel32.dll" );
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(hooks); i++)
+        if (!*hooks[i].real) *hooks[i].real = (void *)GetProcAddress( kernel32, hooks[i].name );
+    if (!real_WriteFile) real_WriteFile = (void *)GetProcAddress( kernel32, "WriteFile" );
+    for (i = 0; i < ARRAY_SIZE(hooks); i++) if (!*hooks[i].real) return FALSE;
+    if (!real_WriteFile) return FALSE;
+
+    for (i = 0; i < ARRAY_SIZE(hooks); i++)
+    {
+        void *orig;
+        hook_import( module, "KERNEL32.dll", hooks[i].name, hooks[i].hook, &orig );
+    }
+    {
+        void *orig;
+        return hook_import( module, "KERNEL32.dll", "WriteFile", hook_WriteFile, &orig );
+    }
+}
+
+/* Condemned.exe at once; the DLLs as they appear (GameServer.dll with the first level). */
+static void watch_file_modules( void )
+{
+    static const char *const names[] = { NULL, "EngineServer.dll", "GameServer.dll", "GameClient.dll", "GameDatabase.dll" };
+    static unsigned int done;
+    unsigned int i;
+
+    if (done == (1u << ARRAY_SIZE(names)) - 1) return;
+    for (i = 0; i < ARRAY_SIZE(names); i++)
+    {
+        HMODULE module;
+
+        if (done & (1u << i)) continue;
+        if (!(module = GetModuleHandleA( names[i] ))) continue;
+        done |= 1u << i;
+        log_line( "%s: writes %s", names[i] ? names[i] : "Condemned.exe",
+                  hook_file_imports( module ) ? "buffered" : "left as they are (no WriteFile import)" );
+    }
+}
+
 /* ---- export ---- */
 
 static HMODULE self;
@@ -1100,7 +1441,7 @@ HRESULT WINAPI DirectInput8Create( HINSTANCE instance, DWORD version, REFIID iid
             return DIERR_GENERIC;
         }
         real_create = (void *)GetProcAddress( real, "DirectInput8Create" );
-        log_line( "build 12: system DirectInput from %s", path );
+        log_line( "build 14: system DirectInput from %s", path );
         if (!real_create) return DIERR_GENERIC;
         if (hook_import( GetModuleHandleA( NULL ), "user32.dll", "SetCursorPos",
                          hook_SetCursorPos, (void **)&real_SetCursorPos ))
@@ -1169,6 +1510,7 @@ BOOL WINAPI DllMainCRTStartup( HINSTANCE instance, DWORD reason, void *reserved 
     {
         self = instance;
         DisableThreadLibraryCalls( instance );
+        InitializeCriticalSection( &wb_lock );
         set_shader_cache_path();
     }
     return TRUE;
