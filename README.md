@@ -48,8 +48,8 @@ About 25–30 fps on the author's console, overclocked: CPU 1683 MHz, GPU 537 MH
 5. Start **Condemned: Setup** once and wait for "Setup done" (press A).
 6. Start **Condemned: Criminal Origins**.
 
-In the game: Options → Controls → Keyboard, bind **Taser** to Ctrl (it has no
-default key; Ctrl is R on the pad). Raise the mouse sensitivity to taste.
+In the game: Options → Controls, bind **Taser** to the right stick press (R3):
+it has no default key. Raise the mouse sensitivity to taste.
 
 ### Controls
 
@@ -62,11 +62,11 @@ default key; Ctrl is R on the pad). Raise the mouse sensitivity to taste.
 | X | E | — | use / pick up |
 | Y | F | — | flashlight |
 | L | Tab | — | melee / firearm |
-| R | Ctrl | — | taser (bind once) |
+| R | Ctrl | — | free |
 | ZL | Shift | — | run |
 | ZR | Space | — | kick |
 | L3 | R | — | check ammo |
-| R3 | F24 (middle mouse) | — | focus |
+| R3 | middle mouse | — | focus, or taser once bound to it |
 | + | Esc | back | pause |
 | − | T | — | forensic tools |
 
@@ -221,8 +221,8 @@ PC-игра 2005 года на (прошитой) Nintendo Switch через
 5. Один раз запустите **Condemned: Setup** и дождитесь окна «Настройка завершена» (A).
 6. Запускайте **Condemned: Criminal Origins**.
 
-В игре: Настройки → Управление → Клавиатура, назначьте **Шокер** на Ctrl (у него нет
-клавиши по умолчанию; Ctrl — кнопка R). Чувствительность мыши — по вкусу.
+В игре: Настройки → Управление, назначьте **Шокер** на нажатие правого стика (R3): у
+него нет кнопки по умолчанию. Чувствительность мыши — по вкусу.
 
 ### Управление
 
@@ -235,11 +235,11 @@ PC-игра 2005 года на (прошитой) Nintendo Switch через
 | X | E | — | использовать / поднять |
 | Y | F | — | фонарик |
 | L | Tab | — | ближний бой / оружие |
-| R | Ctrl | — | шокер (назначить один раз) |
+| R | Ctrl | — | свободна |
 | ZL | Shift | — | бег |
 | ZR | Space | — | пинок |
 | L3 | R | — | проверить патроны |
-| R3 | F24 (средняя кнопка мыши) | — | фокус |
+| R3 | средняя кнопка мыши | — | фокус или шокер, если назначить |
 | + | Esc | назад | пауза |
 | − | T | — | криминалистика |
 
