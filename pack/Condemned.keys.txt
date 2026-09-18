@@ -10,14 +10,14 @@
 # Menus are driven like a console's: D-pad/left stick = arrows, A = Enter, + = Esc.
 # The pack's dinput8.dll turns those into the game's default bindings in play:
 # each arrow also presses W/S/A/D, Enter also presses the left mouse button (Fire),
-# F24 (R3) presses the middle button (Focus). It is also what brings the mouse to
+# F24 (R3) presses the middle button (the taser). It is also what brings the mouse to
 # the game at all: Wine-NX build 108 has no raw mouse input for DirectInput 8.
 #
 # Defaults read from ProfileDatabase\Defaults.Gamdb00p (CondemnedL.Arch00):
 #   Fire = Mouse Button 0, Block = Mouse Button 1, Focus = Mouse Button 2,
 #   W/S/A/D move, Shift run, Space kick, E activate, R ammo check, F flashlight,
-#   T tools, Tab toggle melee, Q lean left, 1-4 "D-Pad" commands, Taser = unbound.
-# Taser has no default: bind it once to the right stick press (R3) in Options > Controls.
+#   T tools, Tab toggle melee, Q lean left, 1-4 "D-Pad" commands.
+# Mouse Button 2 (R3) fires the taser on the console, with no binding needed.
 #
 # Do NOT install the repack's XInputPlus: once a program polls XInput, Wine-NX
 # stops sending keys and mouse from the pad, and Condemned only reads DirectInput.
@@ -32,7 +32,7 @@ ZR=0x20      # Space: kick
 PLUS=0x1B    # Esc: pause / back
 MINUS=0x54   # T: forensic tools
 STICKL=0x52  # R: ammo check
-STICKR=0x87  # F24: Focus (proxy: middle mouse button), or taser once bound to it
+STICKR=0x87  # F24: the taser (proxy: middle mouse button)
 UP=0x26      # Up arrow: menus; in play also W (proxy), forward
 DOWN=0x28    # Down arrow: menus; in play also S, backward
 LEFT=0x25    # Left arrow: menus; in play also A, strafe left

@@ -48,8 +48,8 @@ About 25–30 fps on the author's console, overclocked: CPU 1683 MHz, GPU 537 MH
 5. Start **Condemned: Setup** once and wait for "Setup done" (press A).
 6. Start **Condemned: Criminal Origins**.
 
-In the game: Options → Controls, bind **Taser** to the right stick press (R3):
-it has no default key. Raise the mouse sensitivity to taste.
+The taser is on the right stick press (R3) out of the box. Raise the mouse
+sensitivity in Options → Controls to taste.
 
 ### Controls
 
@@ -66,7 +66,7 @@ it has no default key. Raise the mouse sensitivity to taste.
 | ZL | Shift | — | run |
 | ZR | Space | — | kick |
 | L3 | R | — | check ammo |
-| R3 | middle mouse | — | focus, or taser once bound to it |
+| R3 | middle mouse | — | taser |
 | + | Esc | back | pause |
 | − | T | — | forensic tools |
 
@@ -221,8 +221,8 @@ PC-игра 2005 года на (прошитой) Nintendo Switch через
 5. Один раз запустите **Condemned: Setup** и дождитесь окна «Настройка завершена» (A).
 6. Запускайте **Condemned: Criminal Origins**.
 
-В игре: Настройки → Управление, назначьте **Шокер** на нажатие правого стика (R3): у
-него нет кнопки по умолчанию. Чувствительность мыши — по вкусу.
+Шокер сразу работает на нажатии правого стика (R3). Чувствительность мыши — в игре,
+Настройки → Управление, по вкусу.
 
 ### Управление
 
@@ -239,7 +239,7 @@ PC-игра 2005 года на (прошитой) Nintendo Switch через
 | ZL | Shift | — | бег |
 | ZR | Space | — | пинок |
 | L3 | R | — | проверить патроны |
-| R3 | средняя кнопка мыши | — | фокус или шокер, если назначить |
+| R3 | средняя кнопка мыши | — | шокер |
 | + | Esc | назад | пауза |
 | − | T | — | криминалистика |
 
