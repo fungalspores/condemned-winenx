@@ -142,12 +142,29 @@ helped read its input and sound code.
 | `nsp/` | NSP builder and icon maker |
 | `tools/assemble_sd.py` | Builds the whole card layout from `game/`, `components/` and `pack/` |
 | `release/` | Prebuilt files and both NSPs |
+| `LICENSE` | GPL-3.0 |
 
-### Credits
+### Licence and credits
 
-Wine-NX and mesa-switch by danfromtico · sphaira by ITotalJustice (forwarder:
-nx-hbloader, ISC) · Wine (imaadp32, LGPL-2.1) · DXVK · Mesa · hactool (used to
-check the NSPs) · Condemned: Criminal Origins by Monolith Productions.
+The pack is **GPL-3.0**, see [LICENSE](LICENSE). `nsp/build_nsp.py` is a port of
+sphaira's `owo.cpp` (GPL-3.0), so the whole repository follows it. Parts keep their
+own terms:
+
+- `tools/src/imaadp32/` is Wine's code, **LGPL-2.1-or-later** (headers in the files).
+- The NSPs in `release/` contain sphaira's nx-hbloader forwarder, **ISC**.
+- `release/.../d3dx9_27.dll` is Microsoft's DirectX redistributable.
+
+Wine-NX and mesa-switch by danfromtico · sphaira by ITotalJustice · Wine · DXVK ·
+Mesa · hactool (used to check the NSPs) · Condemned: Criminal Origins by Monolith
+Productions.
+
+### Support the work
+
+The pack is free and always will be. If it earned it:
+
+- **Boosty** — <https://boosty.to/fspores>
+- **USDT (TRC-20 only)** — `TZ5kQSx4HSe8GWr9SfVunYJDofcGLtPWZ7`
+- **Channel** — <https://t.me/fspores>
 
 ---
 
@@ -264,8 +281,32 @@ PC-игра 2005 года на (прошитой) Nintendo Switch через
 Движок — LithTech Jupiter EX; разобраться в его вводе и звуке помогли
 [исходники No One Lives Forever 2](https://github.com/wilkie/no-one-lives-forever-2).
 
-### Благодарности
+### Лицензия и благодарности
 
-Wine-NX и mesa-switch — danfromtico · sphaira — ITotalJustice (форвардер: nx-hbloader,
-ISC) · Wine (imaadp32, LGPL-2.1) · DXVK · Mesa · hactool (проверка NSP) ·
-Condemned: Criminal Origins — Monolith Productions.
+Пак распространяется под **GPL-3.0**, см. [LICENSE](LICENSE). `nsp/build_nsp.py` —
+перенос `owo.cpp` из sphaira (GPL-3.0), поэтому весь репозиторий под ней же. У частей
+свои условия:
+
+- `tools/src/imaadp32/` — код Wine, **LGPL-2.1-or-later** (заголовки в файлах).
+- NSP в `release/` содержат форвардер nx-hbloader из sphaira, **ISC**.
+- `release/.../d3dx9_27.dll` — редистрибутив DirectX от Microsoft.
+
+Wine-NX и mesa-switch — danfromtico · sphaira — ITotalJustice · Wine · DXVK · Mesa ·
+hactool (проверка NSP) · Condemned: Criminal Origins — Monolith Productions.
+
+### Поддержать
+
+Пак бесплатный и таким останется. Если пригодился:
+
+- **Boosty** — <https://boosty.to/fspores>
+- **USDT (только TRC-20)** — `TZ5kQSx4HSe8GWr9SfVunYJDofcGLtPWZ7`
+- **Канал** — <https://t.me/fspores>
+
+---
+
+<sub>This is an independent, unofficial fan project, not affiliated with, endorsed by
+or connected to Nintendo, Monolith Productions or Warner Bros. Games; their names
+and marks belong to their owners. It contains no game files. · Это независимый
+неофициальный фанатский проект, не связанный с Nintendo, Monolith Productions и
+Warner Bros. Games; их названия и знаки принадлежат владельцам. Файлов игры в нём
+нет.</sub>
