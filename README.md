@@ -23,8 +23,11 @@ overlay only — **no game files**. You need your own PC copy of Condemned.
 - `condemned-setup.exe` — run once on the console: fixes `Condemned.exe`'s header,
   disables conflicting files, checks the folder. (It also registers DirectSound, which
   Wine-NX has done by itself since Test Build 4.)
-- Two NSPs: **Condemned: Criminal Origins** (starts the game in Wine-NX, skipping
-  its menu) and **Condemned: Setup**.
+- One NSP: **Condemned: Criminal Origins**, which starts the game in Wine-NX without
+  its menu. The setup program is no longer a second icon: the screen before the game
+  ([winenx-start](https://github.com/fungalspores/winenx-start)) checks whether
+  `Condemned.exe`'s header has been fixed and runs the setup itself when it has not.
+  That screen also opens the game's settings on **+**, five seconds before it starts.
 - `Condemned.keys.txt`, `Condemned.wine-nx.txt` (DXVK), `autoexec.cfg` (1280×720).
 
 About 30 fps on the author's console, overclocked: CPU 1683 MHz, GPU 537 MHz, RAM 2333 MHz.
@@ -42,13 +45,17 @@ The log of the last run is `switch/wine/logs/Condemned.log`.
 ### Install
 
 1. Copy Wine-NX Test Build 4's `switch` folder to the SD card root.
-2. Copy your installed game (the folder with `Condemned.exe`) to
+2. Copy `wine-nx-start.nro` from
+   [winenx-start](https://github.com/fungalspores/winenx-start) to `sdmc:/switch/wine/`:
+   the screen the icon opens before the game, and what runs the setup below.
+3. Copy your installed game (the folder with `Condemned.exe`) to
    `sdmc:/switch/wine/drive_c/condemned/`.
-3. Copy `release/switch` from this repository over the card, **replacing files**
+4. Copy `release/switch` from this repository over the card, **replacing files**
    (the game's own `dinput8.dll` must be replaced by the pack's).
-4. Install both NSPs from `release/` (DBI, sphaira, Tinfoil).
-5. Start **Condemned: Setup** once and wait for "Setup done" (press A).
-6. Start **Condemned: Criminal Origins**.
+5. Install the NSP from `release/` (DBI, sphaira, Tinfoil).
+6. Start **Condemned: Criminal Origins**. The first time, the screen sees that the game
+   has not been set up and runs `condemned-setup.exe` instead: wait for "Setup done",
+   press A, then start the same icon again and play.
 
 The taser is on the right stick press (R3) out of the box. Raise the mouse
 sensitivity in Options → Controls to taste.
@@ -199,8 +206,11 @@ PC-игра 2005 года на (прошитой) Nintendo Switch через
 - `condemned-setup.exe` — запустить один раз на консоли: правит заголовок
   `Condemned.exe`, отключает мешающие файлы, проверяет папку. (DirectSound он тоже
   регистрирует, но начиная с Test Build 4 это делает сам Wine-NX.)
-- Два NSP: **Condemned: Criminal Origins** (запускает игру в Wine-NX без его меню) и
-  **Condemned: Setup**.
+- Один NSP: **Condemned: Criminal Origins** — запускает игру в Wine-NX без его меню.
+  Программа настройки больше не второй значок: экран перед игрой
+  ([winenx-start](https://github.com/fungalspores/winenx-start)) смотрит, исправлен ли
+  заголовок `Condemned.exe`, и сам запускает настройку, если ещё нет. Там же по **+**
+  открываются настройки игры — пять секунд до запуска.
 - `Condemned.keys.txt`, `Condemned.wine-nx.txt` (DXVK), `autoexec.cfg` (1280×720).
 
 На консоли автора — около 30 кадров в секунду, с разгоном: CPU 1683 МГц, GPU 537 МГц, RAM 2333 МГц.
@@ -218,13 +228,17 @@ PC-игра 2005 года на (прошитой) Nintendo Switch через
 ### Установка
 
 1. Скопируйте папку `switch` из Wine-NX Test Build 4 в корень карты.
-2. Скопируйте установленную игру (папку с `Condemned.exe`) в
+2. Положите `wine-nx-start.nro` из
+   [winenx-start](https://github.com/fungalspores/winenx-start) в `sdmc:/switch/wine/` —
+   это экран перед игрой, он же запускает настройку из пункта 6.
+3. Скопируйте установленную игру (папку с `Condemned.exe`) в
    `sdmc:/switch/wine/drive_c/condemned/`.
-3. Скопируйте `release/switch` из репозитория на карту **с заменой**
+4. Скопируйте `release/switch` из репозитория на карту **с заменой**
    (`dinput8.dll` игры должен замениться на файл из пака).
-4. Установите оба NSP из `release/` (DBI, sphaira, Tinfoil).
-5. Один раз запустите **Condemned: Setup** и дождитесь окна «Настройка завершена» (A).
-6. Запускайте **Condemned: Criminal Origins**.
+5. Установите NSP из `release/` (DBI, sphaira, Tinfoil).
+6. Запускайте **Condemned: Criminal Origins**. В первый раз экран увидит, что игра ещё
+   не настроена, и запустит `condemned-setup.exe`: дождитесь окна «Настройка завершена»,
+   нажмите A, потом откройте тот же значок ещё раз — и играйте.
 
 Шокер сразу работает на нажатии правого стика (R3). Чувствительность мыши — в игре,
 Настройки → Управление, по вкусу.
