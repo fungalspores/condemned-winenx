@@ -21,25 +21,27 @@ overlay only — **no game files**. You need your own PC copy of Condemned.
 - `imaadp32.acm` — Wine's IMA ADPCM codec; without it the game's sound driver
   silently turns sound off.
 - `condemned-setup.exe` — run once on the console: fixes `Condemned.exe`'s header,
-  registers DirectSound, disables conflicting files, checks the folder.
+  disables conflicting files, checks the folder. (It also registers DirectSound, which
+  Wine-NX has done by itself since Test Build 4.)
 - Two NSPs: **Condemned: Criminal Origins** (starts the game in Wine-NX, skipping
   its menu) and **Condemned: Setup**.
 - `Condemned.keys.txt`, `Condemned.wine-nx.txt` (DXVK), `autoexec.cfg` (1280×720).
 
-About 25–30 fps on the author's console, overclocked: CPU 1683 MHz, GPU 537 MHz, RAM 2333 MHz.
+About 30 fps on the author's console, overclocked: CPU 1683 MHz, GPU 537 MHz, RAM 2333 MHz.
+The log of the last run is `switch/wine/logs/Condemned.log`.
 
 ### Requirements
 
 - Switch with Atmosphère **1.8.0+** and sigpatches (for the NSPs).
 - SD card formatted **exFAT** (`CondemnedA.Arch00` is 6.2 GB).
-- [Wine-NX Test Build 2](https://github.com/danfromtico/wine-nx/releases/tag/test-build-2) (build 108).
+- [Wine-NX Test Build 4](https://github.com/danfromtico/autorun/releases/tag/test-build-4) (Autorun).
 - Condemned: Criminal Origins for PC, installed, **without SecuROM** — Wine-NX
   cannot run the disc protection. Tested with the English game plus the Spirit Team
   text and Team Raccoon voice translations.
 
 ### Install
 
-1. Copy Wine-NX Test Build 2's `switch` folder to the SD card root.
+1. Copy Wine-NX Test Build 4's `switch` folder to the SD card root.
 2. Copy your installed game (the folder with `Condemned.exe`) to
    `sdmc:/switch/wine/drive_c/condemned/`.
 3. Copy `release/switch` from this repository over the card, **replacing files**
@@ -73,7 +75,7 @@ sensitivity in Options → Controls to taste.
 ### Build from source
 
 ```sh
-sh tools/fetch_winenx.sh                 # Wine-NX Test Build 2 into components/wine-nx
+sh tools/fetch_winenx.sh                 # Wine-NX Test Build 4 into components/wine-nx
 sh tools/fetch_d3dx9_27.sh               # d3dx9_27.dll from Microsoft's DirectX redist
 sh tools/build_win32.sh                  # dinput8.dll, condemned-setup.exe, imaadp32.acm (llvm-mingw)
 pip install cryptography pillow lz4
@@ -97,9 +99,10 @@ Each problem, what caused it and the fix, in the order they showed up.
    `condemned-setup.exe` on the console (`tools/fix_condemned_exe.py` on a computer).
 2. **Missing `d3dx9_27.dll`.** Not in Wine-NX; Microsoft's redistributable DLL is used.
 3. **Black screen forever.** `EAX.DLL` creates DirectSound through COM, and
-   Wine-NX never runs wineboot, so `CLSID_DirectSound8` is not registered. The
+   Wine-NX never ran wineboot, so `CLSID_DirectSound8` was not registered. The
    game's error box was hidden behind the Vulkan surface. Fix: the setup program
-   registers `dsound.dll`.
+   registers `dsound.dll`. Test Build 4 registers it on its own (`config/classes.reg`),
+   so the setup program only repeats what is already there.
 4. **No mouse.** Wine's DirectInput 8 reads the mouse only through raw input, and
    Wine-NX's Horizon server queues raw input for the keyboard but not the mouse.
    Fix: the `dinput8.dll` proxy loads Wine's `dinput8.dll` and fills the system
@@ -194,25 +197,27 @@ PC-игра 2005 года на (прошитой) Nintendo Switch через
 - `imaadp32.acm` — кодек IMA ADPCM из Wine; без него звуковой драйвер игры молча
   выключает звук.
 - `condemned-setup.exe` — запустить один раз на консоли: правит заголовок
-  `Condemned.exe`, регистрирует DirectSound, отключает мешающие файлы, проверяет папку.
+  `Condemned.exe`, отключает мешающие файлы, проверяет папку. (DirectSound он тоже
+  регистрирует, но начиная с Test Build 4 это делает сам Wine-NX.)
 - Два NSP: **Condemned: Criminal Origins** (запускает игру в Wine-NX без его меню) и
   **Condemned: Setup**.
 - `Condemned.keys.txt`, `Condemned.wine-nx.txt` (DXVK), `autoexec.cfg` (1280×720).
 
-На консоли автора — около 25–30 кадров в секунду, с разгоном: CPU 1683 МГц, GPU 537 МГц, RAM 2333 МГц.
+На консоли автора — около 30 кадров в секунду, с разгоном: CPU 1683 МГц, GPU 537 МГц, RAM 2333 МГц.
+Лог последнего запуска — `switch/wine/logs/Condemned.log`.
 
 ### Что нужно
 
 - Switch с Atmosphère **1.8.0+** и sigpatches (для NSP).
 - Карта в **exFAT** (`CondemnedA.Arch00` весит 6,2 ГБ).
-- [Wine-NX Test Build 2](https://github.com/danfromtico/wine-nx/releases/tag/test-build-2) (build 108).
+- [Wine-NX Test Build 4](https://github.com/danfromtico/autorun/releases/tag/test-build-4) (Autorun).
 - Установленная PC-версия Condemned: Criminal Origins **без SecuROM** — защиту диска
   Wine-NX не запускает. Проверено с английской версией, текстом Spirit Team и
   озвучкой Team Raccoon.
 
 ### Установка
 
-1. Скопируйте папку `switch` из Wine-NX Test Build 2 в корень карты.
+1. Скопируйте папку `switch` из Wine-NX Test Build 4 в корень карты.
 2. Скопируйте установленную игру (папку с `Condemned.exe`) в
    `sdmc:/switch/wine/drive_c/condemned/`.
 3. Скопируйте `release/switch` из репозитория на карту **с заменой**
@@ -261,8 +266,10 @@ PC-игра 2005 года на (прошитой) Nintendo Switch через
    (на компьютере — `tools/fix_condemned_exe.py`).
 2. **Нет `d3dx9_27.dll`.** В Wine-NX её нет; берётся DLL из редистрибутива Microsoft.
 3. **Вечный чёрный экран.** `EAX.DLL` создаёт DirectSound через COM, а Wine-NX не
-   запускает wineboot, поэтому `CLSID_DirectSound8` не зарегистрирован. Окно с ошибкой
-   пряталось за поверхностью Vulkan. Решение: setup регистрирует `dsound.dll`.
+   запускал wineboot, поэтому `CLSID_DirectSound8` не был зарегистрирован. Окно с
+   ошибкой пряталось за поверхностью Vulkan. Решение: setup регистрирует `dsound.dll`.
+   В Test Build 4 сборка делает это сама (`config/classes.reg`), и setup лишь повторяет
+   уже сделанное.
 4. **Нет мыши.** DirectInput 8 в Wine читает мышь только через raw input, а сервер
    Horizon в Wine-NX ставит raw input в очередь для клавиатуры, но не для мыши.
    Решение: прокси `dinput8.dll` загружает `dinput8.dll` из Wine и сам заполняет
